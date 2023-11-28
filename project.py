@@ -27,7 +27,8 @@ def download_files_to_directory(url,data_folder,output_directory):
     if os.path.exists(os.path.join(data_folder, zip_name)):
         os.remove(os.path.join(data_folder, zip_name))
     
-url = 'https://files.grouplens.org/datasets/movielens/ml-25m.zip'    
+url = 'https://files.grouplens.org/datasets/movielens/ml-25m.zip' 
+#uncomment the line bellow the first time running the code to download the dataset   
 #download_files_to_directory(url,'data','output')
 
 # After downloading the dataset and unziping it let start by loading the MovieLens dataset
@@ -41,7 +42,7 @@ def clean_title(title):
     return title
 movies["clean_title"] = movies["title"].apply(clean_title)
 
-# we will use tfidf calculation for our search function 
+# we will use tfidf calculation for our search function to be more like a search engine
 vectorizer = TfidfVectorizer(ngram_range=(1,2))
 
 tfidf = vectorizer.fit_transform(movies["clean_title"])
@@ -49,10 +50,18 @@ tfidf = vectorizer.fit_transform(movies["clean_title"])
 def search(title):
     title = clean_title(title)
     query_vec = vectorizer.transform([title])
-    similarity = cosine_similarity(query_vec, tfidf).flatten()# compare our queryto each of the clean titles, return how similar it is
+    similarity = cosine_similarity(query_vec, tfidf).flatten()# compare our query to each of the clean titles, return how similar it is
     indices = np.argpartition(similarity, -5)[-5:]# the 5 titles that have the most similarty to our seach term
     results = movies.iloc[indices].iloc[::-1] # reversing the array, the most similar result is the last in the array
     return results
+
+def creating_links(imdbId):
+    imdbId_str = str(imdbId)
+    if len(imdbId_str) < 7:
+        imdbId_str = "0" * (7 - len(imdbId_str)) + imdbId_str
+    
+    imdb_link = f"https://www.imdb.com/title/tt{imdbId_str}/"
+    return imdb_link
 
 # Train a filtering model
 def find_similar_movies(movie_id):
@@ -70,9 +79,12 @@ def find_similar_movies(movie_id):
     # similar is users that liked the same movie as us, all is the all users in the dataset how much they liked the same movie
     rec_percentages["score"] = rec_percentages["similar"] / rec_percentages["all"]
     rec_percentages = rec_percentages.sort_values("score", ascending=False)# sorting our scores descending, the higher the score the better the recommendation is 
-    return rec_percentages.head(10).merge(movies, left_index=True, right_on="movieId")[["score", "title", "genres"]] # merge our rec_percentages array with the movies dataset to get the title of the movies
+    recommended_movies_links = rec_percentages.merge(movies, left_index=True, right_on="movieId") # merge our rec_percentages array with the movies dataset to get the title of the movies
+    recommended_movies_links = recommended_movies_links.merge(links, how='left', on="movieId")# merge our rec_percentages array with the links dataset to get the links of the movies
+    recommended_movies_links["imdbId_links"] = recommended_movies_links["imdbId"].apply(creating_links)
+    return recommended_movies_links[["movieId","score", "title", "genres","imdbId_links"]].head(10)
 
- 
+
 def find_movies(movie_name):
     results = search(movie_name)
     movie_id = results.iloc[0]["movieId"]
