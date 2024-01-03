@@ -2,4 +2,7 @@ pandas
 numpy
 sklearn
 urllib3
+requests
 zipfile
+streamlit
+surprise
